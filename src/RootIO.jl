@@ -15,6 +15,7 @@ A struct representing a ROOT TTree with its associated branches and file.
 struct TTree
     _ROOT_ttree::ROOT.TTree
     _branch_array
+    _branch_names
     _file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}
 end
 
@@ -54,12 +55,18 @@ function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, 
             _ptr = (_branch_types[i])()
             _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), _ptr, 100, 99)
             push!(_curr_branch_array, _curr_branch)
+        elseif _branch_types[i] == String
+            _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), Ptr{Nothing}(), "$(_branch_names[i])/C")
+            push!(_curr_branch_array, _curr_branch)
+        elseif _branch_types[i] == Bool
+            _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), Ptr{Int8}(), "$(_branch_names[i])/O")
+            push!(_curr_branch_array, _curr_branch)
         else
             _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), Ref(one(_branch_types[i])), 100, 99)
             push!(_curr_branch_array, _curr_branch)
         end
     end
-    return TTree(_tree, _curr_branch_array, file)
+    return TTree(_tree, _curr_branch_array, _branch_names, file)
 end
 
 """
@@ -153,9 +160,18 @@ function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title
             for curr_branch in 1:length(kwargs)
                 if typeof(kwargs[curr_branch][curr_row]) <: CxxWrap.StdVector
                     ROOT.SetObject(it._branch_array[curr_branch], kwargs[curr_branch][curr_row])
-                else
-                    x = kwargs[curr_branch][curr_row]
-                    ROOT.SetAddress(it._branch_array[curr_branch], Ref(x))
+                elseif typeof(kwargs[curr_branch][curr_row]) == String
+                    str = kwargs[curr_branch][curr_row]
+                    GC.@preserve str begin
+                        ROOT.SetBranchAddress(it._ROOT_ttree, string(_branch_names_array[curr_branch]), convert(Ptr{Int8}, pointer(str)))
+                    end
+                elseif typeof(kwargs[curr_branch][curr_row]) == Bool
+                    b = fill(kwargs[curr_branch][curr_row])
+                    GC.@preserve b begin
+                        ROOT.SetBranchAddress(it._ROOT_ttree, string(_branch_names_array[curr_branch]), convert(Ptr{Int8}, pointer(b)))
+                    end
+                else    
+                    ROOT.SetAddress(it._branch_array[curr_branch], Ref(kwargs[curr_branch][curr_row]))
                 end
             end
             _preserved_vars = it._branch_array
@@ -188,10 +204,23 @@ function Fill(tree::TTree, data)
         end
     else
         println("Filling the TTtree with a row")
-        row = map(field -> getfield(data, field), fieldnames(typeof(data)))
+        row = data
+        if !(typeof(row) <: Vector)
+            row = map(field -> getfield(data, field), fieldnames(typeof(data)))
+        end
         for i in 1:length(tree._branch_array)
             if typeof(row[i]) <: CxxWrap.StdVector
                 ROOT.SetObject(tree._branch_array[i], row[i])
+            elseif typeof(row[i]) == String
+                str = row[i]
+                GC.@preserve str begin
+                    ROOT.SetBranchAddress(tree._ROOT_ttree, string(tree._branch_names[i]), convert(Ptr{Int8}, pointer(str)))
+                end
+            elseif typeof(row[i]) == Bool
+                b = fill(row[i])
+                GC.@preserve b begin
+                    ROOT.SetBranchAddress(tree._ROOT_ttree, string(tree._branch_names[i]), convert(Ptr{Int8}, pointer(b)))
+                end
             else
                 ROOT.SetAddress(tree._branch_array[i], Ref(row[i]))
             end

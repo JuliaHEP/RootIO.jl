@@ -95,3 +95,55 @@ end
         _test_tree(Float64, 2, data)
     end
 end
+
+@testset "Writing Booleans" begin
+    @testset "Bools" begin
+        num_events = 3
+        data = Dict(:col => rand(Bool, num_events))
+        _create_test_tree(data)
+
+        file = ROOT.TFile!Open("test.root")
+        t = ROOT.GetTTree(file[], "test_tree")
+
+        a = fill(false)
+        ROOT.SetBranchAddress(t[], "col", Ptr{Nothing}(pointer(a)))
+        nevts = ROOT.GetEntries(t)
+
+        @test nevts == num_events
+        ROOT.GetEntry(t, 0)
+        @test typeof(a[]) == Bool
+        for i in 1:nevts
+            ROOT.GetEntry(t, i - 1)
+            @test data[:col][i] == a[]
+        end
+
+        ROOT.Close(file)
+        rm("test.root")
+    end
+end
+
+@testset "Writing String" begin
+    @testset "String" begin
+        data = Dict(:col => ["CERN", "ROOT", "RootIO"])
+        _create_test_tree(data)
+
+        file = ROOT.TFile!Open("test.root")
+        t = ROOT.GetTTree(file[], "test_tree")
+
+        maxbufferLen = ROOT.GetLenStatic(ROOT.GetLeaf(t, "col"))
+        s = zeros(Int8, maxbufferLen)
+        ROOT.SetBranchAddress(t[], "col", Ptr{Nothing}(pointer(s)))
+        nevts = ROOT.GetEntries(t)
+
+        @test nevts == 3
+        ROOT.GetEntry(t, 0)
+        @test typeof(unsafe_string(pointer(s))) == String
+        for i in 1:nevts
+            ROOT.GetEntry(t, i - 1)
+            @test data[:col][i] == unsafe_string(pointer(s))
+        end
+
+        ROOT.Close(file)
+        rm("test.root")
+    end
+end
