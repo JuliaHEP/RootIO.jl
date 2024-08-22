@@ -6,17 +6,12 @@ import ROOT, Tables, CxxWrap
     struct TTree
 
 A struct representing a ROOT TTree with its associated branches and file.
-
-# Fields
-- `_ROOT_ttree`: The ROOT TTree object.
-- `_branch_array`: An array of branches associated with the TTree.
-- `_file`: A pointer to the ROOT file where the TTree is stored.
 """
 struct TTree
-    _ROOT_ttree::ROOT.TTree
-    _branch_array
-    _branch_names
-    _file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}
+    _ROOT_ttree::ROOT.TTree                             # The ROOT TTree object.
+    _branch_array                                       # An array of branches associated with the TTree.
+    _branch_names                                       # An array of names of branches associated with the TTree
+    _file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}       # A pointer to the ROOT file where the TTree is stored.
 end
 
 """
@@ -31,9 +26,8 @@ function Write(tree::TTree)
     ROOT.Write(tree._ROOT_ttree)
 end
 
-
 """
-    _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, _branch_types, _branch_names)
+    _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
 
 Creates a ROOT TTree with specified branches.
 
@@ -41,38 +35,38 @@ Creates a ROOT TTree with specified branches.
 - `file`: A pointer to a ROOT file where the TTree will be stored.
 - `name`: The name of the TTree.
 - `title`: The title of the TTree.
-- `_branch_types`: A collection of types for the branches.
-- `_branch_names`: A collection of names for the branches.
+- `branch_types`: A collection of types for the branches.
+- `branch_names`: A collection of names for the branches.
 
 # Returns
 - A RootIO `TTree` object containing the ROOT TTree and its branches.
 """
-function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, _branch_types, _branch_names)
-    _tree = ROOT.TTree(name, title)
-    _curr_branch_array = []
-    for i in 1:length(_branch_types)
-        if _branch_types[i] <: CxxWrap.StdVector
-            _ptr = (_branch_types[i])()
-            _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), _ptr, 100, 99)
-            push!(_curr_branch_array, _curr_branch)
-        elseif _branch_types[i] == String
-            _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), Ptr{Nothing}(), "$(_branch_names[i])/C")
-            push!(_curr_branch_array, _curr_branch)
-        elseif _branch_types[i] == Bool
-            _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), Ptr{Int8}(), "$(_branch_names[i])/O")
-            push!(_curr_branch_array, _curr_branch)
+function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
+    tree = ROOT.TTree(name, title)
+    current_branches = []
+    for i in eachindex(branch_types)
+        if branch_types[i] <: CxxWrap.StdVector
+            ptr = (branch_types[i])()
+            curr_branch = ROOT.Branch(tree, string(branch_names[i]), ptr, 3200, 99)
+            push!(current_branches, curr_branch)
+        elseif branch_types[i] == String
+            curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Nothing}(), "$(branch_names[i])/C")
+            push!(current_branches, curr_branch)
+        elseif branch_types[i] == Bool
+            curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Int8}(), "$(branch_names[i])/O")
+            push!(current_branches, curr_branch)
         else
-            _curr_branch = ROOT.Branch(_tree, string(_branch_names[i]), Ref(one(_branch_types[i])), 100, 99)
-            push!(_curr_branch_array, _curr_branch)
+            curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ref(one(branch_types[i])), 3200, 99)
+            push!(current_branches, curr_branch)
         end
     end
-    return TTree(_tree, _curr_branch_array, _branch_names, file)
+    return TTree(tree, current_branches, branch_names, file)
 end
 
 """
     TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
 
-Creates a new ROOT TTree and fills it with the provided data.
+Creates a new ROOT TTree with branches of given type or branches having types infered from the given data (data is not written to the tree).
 
 # Arguments
 - `file`: A pointer to a ROOT file where the TTree will be stored.
@@ -101,25 +95,16 @@ end
 ````
 """
 function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
-    println("Creating a new TTree")
-
-    _branch_types_array = []
-    _branch_names_array = []
+    branch_types= []
+    branch_names = []
     if isa(data, DataType)
-        _branch_types_array = fieldtypes(data)
-        _branch_names_array = fieldnames(data)
+        branch_types = fieldtypes(data)
+        branch_names = fieldnames(data)
     else
-        _branch_types_array = fieldtypes(typeof(data))
-        _branch_names_array = fieldnames(typeof(data))
+        branch_types = fieldtypes(typeof(data))
+        branch_names = fieldnames(typeof(data))
     end
-
-    it = _makeTTree(file, name, title, _branch_types_array, _branch_names_array)
-
-    if !isa(data, DataType)
-        Fill(it, data)
-    end
-
-    return it
+    return _makeTTree(file, name, title, branch_types, branch_names)
 end
 
 """
@@ -142,8 +127,6 @@ data = (col_float=rand(Float64, 3), col_int=rand(Int32, 3))
 tree = RootIO.TTree(file, name, title; data...)
 """
 function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String; kwargs...)
-    println("Creating a new TTree")
-
     _branch_types_array = []
     _branch_names_array = NTuple{length(kwargs), Symbol}(collect(keys(kwargs)))
     if isa(kwargs[1], DataType)
@@ -152,33 +135,7 @@ function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title
         _branch_types_array = NTuple{length(kwargs), DataType}([eltype(value) for value in values(kwargs)])
     end
 
-    it = _makeTTree(file, name, title, _branch_types_array, _branch_names_array)
-
-    if !isa(kwargs[1], DataType)
-        num_rows = length(kwargs[1])
-        for curr_row in 1:num_rows
-            for curr_branch in 1:length(kwargs)
-                if typeof(kwargs[curr_branch][curr_row]) <: CxxWrap.StdVector
-                    ROOT.SetObject(it._branch_array[curr_branch], kwargs[curr_branch][curr_row])
-                elseif typeof(kwargs[curr_branch][curr_row]) == String
-                    str = kwargs[curr_branch][curr_row]
-                    GC.@preserve str begin
-                        ROOT.SetBranchAddress(it._ROOT_ttree, string(_branch_names_array[curr_branch]), convert(Ptr{Int8}, pointer(str)))
-                    end
-                elseif typeof(kwargs[curr_branch][curr_row]) == Bool
-                    b = fill(kwargs[curr_branch][curr_row])
-                    GC.@preserve b begin
-                        ROOT.SetBranchAddress(it._ROOT_ttree, string(_branch_names_array[curr_branch]), convert(Ptr{Int8}, pointer(b)))
-                    end
-                else    
-                    ROOT.SetAddress(it._branch_array[curr_branch], Ref(kwargs[curr_branch][curr_row]))
-                end
-            end
-            _preserved_vars = it._branch_array
-            GC.@preserve _preserved_vars ROOT.Fill(it._ROOT_ttree)
-        end
-    end
-
+    return _makeTTree(file, name, title, _branch_types_array, _branch_names_array)
     return it
 end
 
@@ -198,35 +155,28 @@ Fill(tree, data)
 """
 function Fill(tree::TTree, data)
     if Tables.istable(data)
-        println("Filling the TTree with a table")
         for row in Tables.rows(data)
             Fill(tree, row)
         end
     else
-        println("Filling the TTtree with a row")
         row = data
-        if !(typeof(row) <: Vector)
+        if !isa(row, Array)
             row = map(field -> getfield(data, field), fieldnames(typeof(data)))
         end
-        for i in 1:length(tree._branch_array)
-            if typeof(row[i]) <: CxxWrap.StdVector
-                ROOT.SetObject(tree._branch_array[i], row[i])
-            elseif typeof(row[i]) == String
-                str = row[i]
-                GC.@preserve str begin
-                    ROOT.SetBranchAddress(tree._ROOT_ttree, string(tree._branch_names[i]), convert(Ptr{Int8}, pointer(str)))
+        GC.@preserve row begin
+            for i in eachindex(tree._branch_array)
+                if isa(row[i], CxxWrap.StdVector)  
+                    ROOT.SetObject(tree._branch_array[i], row[i])
+                elseif isa(row[i], String)
+                    ROOT.SetAddress(tree._branch_array[i], convert(Ptr{Nothing}, pointer(row[i])))
+                elseif isa(row[i], Bool)
+                    ROOT.SetAddress(tree._branch_array[i], convert(Ptr{Nothing}, pointer(fill(row[i]))))
+                else
+                    ROOT.SetAddress(tree._branch_array[i], Ref(row[i]))
                 end
-            elseif typeof(row[i]) == Bool
-                b = fill(row[i])
-                GC.@preserve b begin
-                    ROOT.SetBranchAddress(tree._ROOT_ttree, string(tree._branch_names[i]), convert(Ptr{Int8}, pointer(b)))
-                end
-            else
-                ROOT.SetAddress(tree._branch_array[i], Ref(row[i]))
+                ROOT.Fill(tree._ROOT_ttree)
             end
         end
-        _preserved_vars = tree._branch_array
-        GC.@preserve _preserved_vars ROOT.Fill(tree._ROOT_ttree)
     end
 end 
 

@@ -1,6 +1,6 @@
 name = "RootIO"
 uuid = "84287b9e-b673-4340-bb1d-a334fb11fbd4"
-authors = ["Yash Solanki <67216443+yashnator@users.noreply.github.com>"]
+authors = ["Yash Solanki <252yash@gmail.com>"]
 version = "0.1.0"
 
 [deps]
