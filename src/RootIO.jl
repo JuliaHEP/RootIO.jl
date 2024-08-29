@@ -2,6 +2,8 @@ module RootIO
 
 import ROOT, Tables, CxxWrap
 
+export TTree, Write, Fill
+
 """
     struct TTree
 
@@ -27,6 +29,44 @@ function Write(tree::TTree)
 end
 
 """
+    _getTypeCharacter(julia_type::DataType)
+Returns the TTree type code for the input Julia data type
+# Arguments
+- `julia_type::DataType`: The Julia type for which TTree type code is required.
+"""
+function _getTypeCharacter(julia_type::DataType)
+    if julia_type == String
+        return "C"
+    elseif julia_type == Int8
+        return "B"
+    elseif julia_type == UInt8
+        return "b"
+    elseif julia_type == Int16
+        return "S"
+    elseif julia_type == UInt16
+        return "s"
+    elseif julia_type == Int32
+        return "I"
+    elseif julia_type == UInt32
+        return "i"
+    elseif julia_type == Float32
+        return "F"
+    # elseif julia_type == ROOT.Half32
+    #     return "f"
+    elseif julia_type == Float64
+        return "D"
+    # elseif julia_type == ROOT.Double32
+    #     return "d"
+    elseif julia_type == Int64
+        return "L"
+    elseif julia_type == UInt64
+        return "l"
+    elseif julia_type == Bool
+        return "O"
+    end
+end
+
+"""
     _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
 
 Creates a ROOT TTree with specified branches.
@@ -45,7 +85,16 @@ function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, 
     tree = ROOT.TTree(name, title)
     current_branches = []
     for i in eachindex(branch_types)
-        if branch_types[i] <: CxxWrap.StdVector
+        if isa(branch_types[i], Tuple)
+            type_identifier = _getTypeCharacter(branch_types[i][1])
+            if isa(branch_types[i][2], Symbol)
+                curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Nothing}(), "$(branch_names[i])[$(string(branch_types[i][2]))]/$(type_identifier)")
+                push!(current_branches, curr_branch)
+            else
+                curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Nothing}(), "$(branch_names[i])[$(branch_types[i][2])]/$(type_identifier)")
+                push!(current_branches, curr_branch)
+            end
+        elseif branch_types[i] <: CxxWrap.StdVector
             ptr = (branch_types[i])()
             curr_branch = ROOT.Branch(tree, string(branch_names[i]), ptr, 3200, 99)
             push!(current_branches, curr_branch)
@@ -64,7 +113,7 @@ function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, 
 end
 
 """
-    TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
+    TTree(file, name, title, data)
 
 Creates a new ROOT TTree with branches of given type or branches having types infered from the given data (data is not written to the tree).
 
@@ -92,7 +141,7 @@ for i in 1:10
     e.v .= rand(Float32, 5)
     RootIO.Fill(tree, e)
 end
-````
+```
 """
 function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
     branch_types= []
@@ -128,15 +177,18 @@ tree = RootIO.TTree(file, name, title; data...)
 """
 function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String; kwargs...)
     _branch_types_array = []
-    _branch_names_array = NTuple{length(kwargs), Symbol}(collect(keys(kwargs)))
-    if isa(kwargs[1], DataType)
-        _branch_types_array = NTuple{length(kwargs), DataType}(collect(values(kwargs)))
-    else
-        _branch_types_array = NTuple{length(kwargs), DataType}([eltype(value) for value in values(kwargs)])
-    end
+    _branch_names_array = []
 
+    for (key, value) in kwargs
+        push!(_branch_names_array, key)
+        if isa(value, Tuple) || isa(value, DataType)
+            push!(_branch_types_array, value)
+        else
+            push!(_branch_types_array, eltype(value))
+        end
+    end
+    
     return _makeTTree(file, name, title, _branch_types_array, _branch_names_array)
-    return it
 end
 
 """
@@ -151,7 +203,12 @@ Fills a ROOT TTree with the provided data.
 # Example
 ```julia
 # Assuming `tree` is an existing TTree and `data` is a table or row
-Fill(tree, data)
+file = ROOT.TFile!Open("example.root", "RECREATE")
+name = "example_tree"
+title = "Example TTree"
+tree = RootIO.TTree(file, name, title, [Float64])
+RootIO.Fill(tree, 1.0)
+```
 """
 function Fill(tree::TTree, data)
     if Tables.istable(data)
@@ -165,7 +222,9 @@ function Fill(tree::TTree, data)
         end
         GC.@preserve row begin
             for i in eachindex(tree._branch_array)
-                if isa(row[i], CxxWrap.StdVector)  
+                if isa(row[i], Array)
+                    ROOT.SetAddress(tree._branch_array[i], convert(Ptr{Nothing}, pointer(row[i])))
+                elseif isa(row[i], CxxWrap.StdVector)  
                     ROOT.SetObject(tree._branch_array[i], row[i])
                 elseif isa(row[i], String)
                     ROOT.SetAddress(tree._branch_array[i], convert(Ptr{Nothing}, pointer(row[i])))
@@ -174,8 +233,8 @@ function Fill(tree::TTree, data)
                 else
                     ROOT.SetAddress(tree._branch_array[i], Ref(row[i]))
                 end
-                ROOT.Fill(tree._ROOT_ttree)
             end
+            ROOT.Fill(tree._ROOT_ttree)
         end
     end
 end 
