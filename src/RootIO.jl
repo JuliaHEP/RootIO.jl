@@ -28,12 +28,10 @@ function Write(tree::TTree)
     ROOT.Write(tree._ROOT_ttree)
 end
 
-"""
-    _getTypeCharacter(julia_type::DataType)
-Returns the TTree type code for the input Julia data type
-# Arguments
-- `julia_type::DataType`: The Julia type for which TTree type code is required.
-"""
+#     _getTypeCharacter(julia_type::DataType)
+# Returns the TTree type code for the input Julia data type
+# # Arguments
+# - `julia_type::DataType`: The Julia type for which TTree type code is required.
 function _getTypeCharacter(julia_type::DataType)
     if julia_type == String
         return "C"
@@ -66,21 +64,19 @@ function _getTypeCharacter(julia_type::DataType)
     end
 end
 
-"""
-    _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
+#     _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
 
-Creates a ROOT TTree with specified branches.
+# Creates a ROOT TTree with specified branches.
 
-# Arguments
-- `file`: A pointer to a ROOT file where the TTree will be stored.
-- `name`: The name of the TTree.
-- `title`: The title of the TTree.
-- `branch_types`: A collection of types for the branches.
-- `branch_names`: A collection of names for the branches.
+# # Arguments
+# - `file`: A pointer to a ROOT file where the TTree will be stored.
+# - `name`: The name of the TTree.
+# - `title`: The title of the TTree.
+# - `branch_types`: A collection of types for the branches.
+# - `branch_names`: A collection of names for the branches.
 
-# Returns
-- A RootIO `TTree` object containing the ROOT TTree and its branches.
-"""
+# # Returns
+# - A RootIO `TTree` object containing the ROOT TTree and its branches.
 function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
     tree = ROOT.TTree(name, title)
     current_branches = []
@@ -113,7 +109,7 @@ function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, 
 end
 
 """
-    TTree(file, name, title, data)
+    TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
 
 Creates a new ROOT TTree with branches of given type or branches having types infered from the given data (data is not written to the tree).
 
@@ -174,6 +170,7 @@ name = "example_tree"
 title = "Example TTree"
 data = (col_float=rand(Float64, 3), col_int=rand(Int32, 3))
 tree = RootIO.TTree(file, name, title; data...)
+```
 """
 function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String; kwargs...)
     _branch_types_array = []
@@ -203,11 +200,7 @@ Fills a ROOT TTree with the provided data.
 # Example
 ```julia
 # Assuming `tree` is an existing TTree and `data` is a table or row
-file = ROOT.TFile!Open("example.root", "RECREATE")
-name = "example_tree"
-title = "Example TTree"
-tree = RootIO.TTree(file, name, title, [Float64])
-RootIO.Fill(tree, 1.0)
+Fill(tree, data)
 ```
 """
 function Fill(tree::TTree, data)
