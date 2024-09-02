@@ -157,3 +157,71 @@ end
         rm("test.root")
     end
 end
+
+@testset "Writing C-style arrays" begin
+    @testset "Fixed size C-array" begin
+        import RootIO, ROOT
+        file = ROOT.TFile!Open("test.root", "RECREATE")
+        name = "test_tree"
+        title = "Test TTree"
+        my_arr_fixed_length = 3
+        tree = RootIO.TTree(file, name, title; my_arr = (Int64, my_arr_fixed_length))
+        RootIO.Fill(tree, [[1,2,3]])
+        RootIO.Fill(tree, [[-1,1,-1]])
+        RootIO.Write(tree)
+        ROOT.Close(file)
+
+        file = ROOT.TFile!Open("test.root")
+        t = file["test_tree"]
+        maxbufferLen = ROOT.GetLenStatic(ROOT.GetLeaf(t, "my_arr"))
+        arr = zeros(Int64, maxbufferLen)
+        ROOT.SetBranchAddress(t, "my_arr", Ptr{Nothing}(pointer(arr)))
+        nevts = ROOT.GetEntries(t)
+        @test nevts == 2
+        for i in 1:nevts
+            ROOT.GetEntry(t, i - 1)
+            if i == 1
+                @test arr == [1,2,3]
+            else
+                @test arr == [-1,1,-1]
+            end
+        end
+        ROOT.Close(file)
+        rm("test.root")
+    end
+
+    @testset "Variable size C-array" begin
+        import RootIO, ROOT
+        file = ROOT.TFile!Open("test.root", "RECREATE")
+        name = "test_tree"
+        title = "Test TTree"
+        rows = [[1,10,100], [2,20]]
+        tree = RootIO.TTree(file, name, title; arr_size = Int64, my_arr = (Int64, :arr_size))
+        for row in rows 
+            RootIO.Fill(tree, [length(row), row])
+        end
+        RootIO.Write(tree)
+        ROOT.Close(file)
+
+        file = ROOT.TFile!Open("test.root")
+        t = file["test_tree"]
+        maxbufferLen = 3
+        arr_sz = fill(0)
+        arr = zeros(Int64, maxbufferLen)
+        ROOT.SetBranchAddress(t, "arr_size", arr_sz)
+        ROOT.SetBranchAddress(t, "my_arr", Ptr{Nothing}(pointer(arr)))
+        nevts = ROOT.GetEntries(t)
+        @test nevts == 2
+        ROOT.GetEntry(t, 0)
+        @test isa((arr_sz[]), Int64)
+        for i in 1:nevts
+            ROOT.GetEntry(t, i - 1)
+            @test arr_sz[] == length(rows[i])
+            for j in 1:arr_sz[]
+                @test arr[j] == rows[i][j]
+            end
+        end
+        ROOT.Close(file)
+        rm("test.root")
+    end
+end
