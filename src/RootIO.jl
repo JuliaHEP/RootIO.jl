@@ -1,13 +1,14 @@
 module RootIO
 
 import ROOT, Tables, CxxWrap
+import ROOT.Write, ROOT.Fill, ROOT.Scan, ROOT.Print, ROOT.GetEntries, CxxWrap.StdVector
 
-export TTree, Write, Fill
+export TTree, Write, Fill, Print, Scan, GetEntries, StdVector
 
 """
-    struct TTree
+    `TTree`
 
-A struct representing a ROOT TTree with its associated branches and file.
+Type representing a `ROOT` tree. It must be used in place of the `TTree` type of the `ROOT` module.
 """
 struct TTree
     _ROOT_ttree::ROOT.TTree                             # The ROOT TTree object.
@@ -17,12 +18,44 @@ struct TTree
 end
 
 """
+   `Scan(tree, varexp = "", selection = "", option = "", nentries = -1, firstentry = 0) `
+
+Loop over tree entries and print entries passing selection.
+
+ - If varexp is 0 (or "") then print only first 8 columns.
+ - If varexp = "*" print all columns.
+
+Otherwise a column selection can be made using "var1:var2:var3".
+"""
+Scan(tree::RootIO.TTree, args...) = Scan(tree._ROOT_ttree, args...)
+
+"""
+    Print(tree, options = "")
+
+Print a summary of the tree contents.
+
+   - If option contains "all" friend trees are also printed.
+   - If option contains "toponly" only the top level branches are printed.
+   - If option contains "clusters" information about the cluster of baskets is printed.
+
+Wildcarding can be used to print only a subset of the branches, e.g., Print(tree, "Elec*") will print all branches with name starting with "Elec".
+
+"""
+Print(tree::RootIO.TTree) = Print(tree._ROOT_ttree)
+
+"""
+`GetEntries(tree)`
+
+Returns the number of entries (aka rows) stored in the `tree`.
+
+"""
+GetEntries(tree::RootIO.TTree) = GetEntries(tree._ROOT_ttree)
+
+"""
     Write(tree::TTree)
 
-Writes a ROOT TTree to the associated ROOT file.
+Save the `tree` into the associated `ROOT` file. This method needs to be called to finalize the writing to disk.
 
-# Arguments
-- `tree::TTree`: The TTree object to be written to the ROOT file.
 """
 function Write(tree::TTree)
     ROOT.Write(tree._ROOT_ttree)
@@ -66,7 +99,7 @@ end
 
 #     _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, branch_types, branch_names)
 
-# Creates a ROOT TTree with specified branches.
+# Create a ROOT TTree with the specified branches.
 
 # # Arguments
 # - `file`: A pointer to a ROOT file where the TTree will be stored.
@@ -92,51 +125,59 @@ function _makeTTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, 
             end
         elseif branch_types[i] <: CxxWrap.StdVector
             ptr = (branch_types[i])()
-            curr_branch = ROOT.Branch(tree, string(branch_names[i]), ptr, 3200, 99)
-            push!(current_branches, curr_branch)
+                curr_branch = ROOT.Branch(tree, string(branch_names[i]), ptr, 3200, 99)
+                push!(current_branches, curr_branch)
         elseif branch_types[i] == String
-            curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Nothing}(), "$(branch_names[i])/C")
-            push!(current_branches, curr_branch)
+                curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Nothing}(), "$(branch_names[i])/C")
+                push!(current_branches, curr_branch)
         elseif branch_types[i] == Bool
             curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ptr{Int8}(), "$(branch_names[i])/O")
-            push!(current_branches, curr_branch)
-        else
+                push!(current_branches, curr_branch)
+            else
             curr_branch = ROOT.Branch(tree, string(branch_names[i]), Ref(one(branch_types[i])), 3200, 99)
-            push!(current_branches, curr_branch)
+                push!(current_branches, curr_branch)
+            end
         end
-    end
     return TTree(tree, current_branches, branch_names, file)
 end
 
 """
-    TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
+    TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, rowtype)
 
-Creates a new ROOT TTree with branches of given type or branches having types infered from the given data (data is not written to the tree).
+Create a ROOT TTree to store instances of a composite type, `rowtype`. Each field of the type is mapped to a TTree branch (aka column) of the same name. Each field must be annotated with its type in the declaration of `rowtype` declaration. The [`Fill`](@ref) function must be used to store the instance. Each instance will be stored in a TTree entry (aka row).
 
-# Arguments
-- `file`: A pointer to a ROOT file where the TTree will be stored.
-- `name`: The name of the TTree.
-- `title`: The title of the TTree.
-- `data`: The data used to define and optionally fill the branches of the TTree. This can be a `DataType` or an instance of a type with fields.
+Note: for convenience, providing an instance of the row type instead of the type itself is currently supported. This support might eventually be dropped if we find that it leads to confusion. The instance is used solely to retrieve the type and is not nserted in the tree. See [`TTree(::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, ::String, ::String; columns...)`](@ref) to create and fill a tree in one go.
 
 # Example
 ```julia
+
+using CxxWrap, ROOT, RootIO
 mutable struct Event
     x::Float32
     y::Float32
     z::Float32
     v::StdVector{Float32}
 end
-f = ROOT.TFile!Open("data.root", "RECREATE")
 Event()  = Event(0., 0., 0., StdVector{Float32}())
+
+# Create the tree
+f = ROOT.TFile!Open("data.root", "RECREATE")
 tree = RootIO.TTree(f, "mytree", "mytreetitle", Event)
+
+# Fill the tree
 e = Event()
 for i in 1:10
     e.x, e.y, e.z = rand(3)
-    resize!.([e.v], 5)
-    e.v .= rand(Float32, 5)
-    RootIO.Fill(tree, e)
+    n = rand(1:5)
+    # Two next lines are an optimized version of e.v = rand(Float32)
+    # by limiting time consuming memory allocation
+    resize!(e.v, n)
+    e.v .= rand(Float32)
+    Fill(tree, e)
 end
+
+# Display tree contents
+Scan(tree)
 ```
 """
 function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String, data)
@@ -153,17 +194,37 @@ function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title
 end
 
 """
-    TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String; kwargs...)
+    TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title::String; columns...)
 
-Creates a new ROOT TTree and fills it with the provided data.
+Creates a new ROOT tree and fill it with the provided data.
 
 # Arguments
 - `file`: A pointer to a ROOT file where the TTree will be stored.
 - `name`: The name of the TTree.
 - `title`: The title of the TTree.
-- `kwargs...`: Named arguments representing the branches of the TTree. Each named argument is either a data type or an array of data.
+- `columns...`: column definitions passed as named argument, in the form column_name = column_content or column_name = element_type
 
-# Example
+# Creation of an empty `TTree`
+
+If the `columns` values are data types, then an empty `TTree` is created. The argument names are used for the column (aka branch) names and their value specify the type of elements to store in the column.
+
+## Example
+```julia
+using ROOT, RootIO
+
+# Create the tree
+file = ROOT.TFile!Open("example.root", "RECREATE")
+tree = RootIO.TTree(file, "mytree", "My tree"; col_int = Int64, col_float = Float64)
+
+# Display the tree definition
+Print(tree)
+```
+
+# Creation and filling of a `TTree`
+
+If the `columns` values are vectors, a `TTree` is created and filled with the data provided in the vectors. A branch is created for each `columns` argument with the name of the argument and filled with each element of the vector provided as the argument value. All the vectors must be of the same length.
+
+## Example
 ```julia
 file = ROOT.TFile!Open("example.root", "RECREATE")
 name = "example_tree"
@@ -180,32 +241,41 @@ function TTree(file::CxxWrap.CxxWrapCore.CxxPtr{ROOT.TFile}, name::String, title
         push!(_branch_names_array, key)
         if isa(value, Tuple) || isa(value, DataType)
             push!(_branch_types_array, value)
-        else
+            else
             push!(_branch_types_array, eltype(value))
         end
     end
-    
+
     return _makeTTree(file, name, title, _branch_types_array, _branch_names_array)
 end
 
 """
     Fill(tree::TTree, data)
 
-Fills a ROOT TTree with the provided data.
+Append one or more rows (aka entries) to the ROOT `tree`.
 
-# Arguments
-- `tree`: The TTree object to be filled.
-- `data`: The data to fill the TTree with. This can be a table or a row.
+Single row can be provided as an instance of a composite type or of a `Tuple`.
 
 # Example
 ```julia
-# Assuming `tree` is an existing TTree and `data` is a table or row
-Fill(tree, data)
+using ROOT, RootIO
+
+# Create the tree
+file = ROOT.TFile!Open("example.root", "RECREATE")
+tree = RootIO.TTree(file, "mytree", "My tree"; col_int = Int64, col_float = Float64)
+
+# Fill the tree
+for i in 1:10
+    Fill(tree, (i, i*π))
+end
+
+# Display the tree contents
+Scan(tree)
 ```
 """
 function Fill(tree::TTree, data)
     if Tables.istable(data)
-        for row in Tables.rows(data)
+    for row in Tables.rows(data)
             Fill(tree, row)
         end
     else
@@ -225,11 +295,11 @@ function Fill(tree::TTree, data)
                     ROOT.SetAddress(tree._branch_array[i], convert(Ptr{Nothing}, pointer(fill(row[i]))))
                 else
                     ROOT.SetAddress(tree._branch_array[i], Ref(row[i]))
-                end
-            end
-            ROOT.Fill(tree._ROOT_ttree)
-        end
     end
-end 
+end
+        ROOT.Fill(tree._ROOT_ttree)
+    end
+end
+end
 
 end # module RootIO
