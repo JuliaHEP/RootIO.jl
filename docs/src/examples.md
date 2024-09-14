@@ -1,116 +1,200 @@
 # Examples
 
-## Writing primitive types
+## Row-by-row filling
 
-All the primitive types and structs can be written to the TTree using the RootIO.jl library. By convention, a data type or an instance of the column can be used to create the columns. 
+### Example 1: storing scalars
 
-A complete list of supported Julia and ROOT custom types can be found in the [introduction page](@ref Introduction).
-
-!!! tip "Creating TTree with columns instances"
-    Creating a TTree with row instance only infers the types from the instance, and doesn't write it to the TTree
-
-### Writing to a TTree using keyword-argument and instance of row
-
-Keyword-arguments can be used to pass instance of a column to the tree. The types and names are inferred from the arguments.
+In this example, the columns are filled with data of primitive types.
 
 ```julia
-import RootIO, ROOT
-using DataFrames
+using RootIO, ROOT
+using Random
+
+# Create a ROOT file
 file = ROOT.TFile!Open("example.root", "RECREATE")
-name = "example_tree"
-title = "Example TTree"
-data = (col_float=rand(Float64, 3), col_int=rand(Int32, 3))
-tree = RootIO.TTree(file, name, title; data...)
+
+# Create the tree
+tree = RootIO.TTree(file, "tree", "My Tree", pt = Float64, eta = Float64, phi = Float64)
+
+# Fill the tree with random values
+for i in 1:10
+Fill(tree, (pt = 100*randexp(), eta = 5*randn(), phi = 2π*rand()))
+end
+
+# Display tree content
+Scan(tree)
+
+# Save the tree and close the file
 RootIO.Write(tree)
 ROOT.Close(file)
 ```
 
-### Writing a struct to a TTree
+### Example 2: storing value collections using the array branch type
 
-The fieldnames and field types of the struct are used to create the branches of the TTree.
+This example shows how to store a collection of values using the tree branch array type. With the array type, the collection length is specified in a different branch (if not fixed). Upon `TTree` creation, the array type is specified using a tuple `(etype, length)`, with `etype` the element type and `length` the array size specification, either an integer or a symbol that refers to the name of the branch where the number of elements is stored. 
 
 ```julia
-import RootIO, ROOT
-using CxxWrap
-mutable struct Event
-    x::Float32
-    y::Float32
-    z::Float32
-    v::StdVector{Float32}
+using RootIO, ROOT
+using Random
+
+# Create a ROOT file
+file = ROOT.TFile!Open("example.root", "RECREATE")
+
+# Create the tree
+tree = RootIO.TTree(file, "tree", "My Tree", nparts=Int32, pt=(Float64, :nparts), eta=(Float64, :nparts), phi=(Float64, :nparts))
+
+# Fill the tree with random values
+for i in 1:10
+    n = rand(Vector{Int32}(1:10))
+    Fill(tree, (nparts=n, pt=100*randexp(n), eta=5*randn(n), phi=2π*rand(n)))
 end
-f = ROOT.TFile!Open("data.root", "RECREATE")
-Event()  = Event(0., 0., 0., StdVector{Float32}())
-tree = RootIO.TTree(f, "mytree", "mytreetitle", Event)
+
+# Display the tree content
+Scan(tree)
+
+# Print the tree structure: we notice the array type of the branches e.g., `pt[nparts]/D`
+Print(tree)
+
+# Save the tree and close the file
+Write(tree)
+Close(file)
+```
+
+### Example 3: storing collection of values using STL vectors
+
+This example is similar to Example 2, but it uses standard template library vectors to store the collection of values instead of the ROOT tree array type.
+
+```julia
+using RootIO, ROOT
+using Random
+
+# Create a ROOT file
+file = ROOT.TFile!Open("example.root", "RECREATE")
+
+# Create the tree
+tree = RootIO.TTree(file, "tree", "My Tree", nparts=Int32, pt=StdVector{Float64}, eta=StdVector{Float64}, phi=StdVector{Float64})
+
+# Fill the tree with random values
+for i in 1:10
+    n = rand(Vector{Int32}(1:10))
+   Fill(tree, (nparts=n, pt=StdVector(100*randexp(n)), eta=StdVector(5*randn(n)), phi=StdVector(2π*rand(n))))
+end
+
+# Display tree content
+Scan(tree)
+
+# Print the tree structure: we notice the `vector<double>` branh types
+Print(tree)
+
+# Save the tree and close the file
+RootIO.Write(tree)
+ROOT.Close(file)
+```
+
+### Example 4: row data grouped in a composite type
+
+This example is similar to examples 2 and 3, but with row data provided as a composite type (struct).
+
+```julia
+using RootIO, ROOT
+using Random
+
+# The composite type used to store data of a row:
+mutable struct Event
+    nparts::Int32
+    pt::StdVector{Float64}
+    eta::StdVector{Float64}
+    phi::StdVector{Float64}
+end
+Event()  = Event(0., StdVector{Float64}(), StdVector{Float64}(), StdVector{Float64}())
+
+# Create the ROOT file
+f = ROOT.TFile!Open("example.root", "RECREATE")
+
+# Create the tree
+tree = RootIO.TTree(f, "tree", "My Tree", Event)
+
 e = Event()
 for i in 1:10
-    e.x, e.y, e.z = rand(3)
-    resize!.([e.v], 5)
-    e.v .= rand(Float32, 5)
+    e.nparts = rand(Vector{Int32}(1:10))
+    e.pt = StdVector(100*randexp(e.nparts))
+    e.eta = StdVector(5*randn(e.nparts))
+    e.phi = StdVector(2π*rand(e.nparts))
     RootIO.Fill(tree, e)
 end
+
+# Display tree contents
+Scan(tree)
+
+# Save the tree and close the file
 RootIO.Write(tree)
-ROOT.Close(f)
+Close(f)
 ```
+## Multiple-row filling
 
-## Writing vectors
+### Example 5: columns provided as vectors
 
-RootIO.jl supports writing of the ```CxxWrap.StdVector``` that wraps the ```std::vector``` from C/C++.
+_⚠ This example is not yet working with this version of `RootIO`._
 
 ```julia
-import RootIO, ROOT, CxxWrap
-# Create and open the ROOT file
-file = ROOT.TFile!Open("example.root", "RECREATE")
-name = "example_tree"
-title = "Example TTree"
-v = StdVector{Float32}()
-# Create a columns for CxxWrap.StdVector data type
-tree = RootIO.TTree(file, name, title; my_arr = CxxWrap.StdVector)
-# Write the CxxWrap.Std vector to the TTree
-v .= rand(Float32, 5)
-RootIO.Fill(tree, [v])
+using RootIO, ROOT
+using Random
+
+# Create the ROOT file
+f = ROOT.TFile!Open("example.root", "RECREATE")
+
+# Create the tree and fill it with the dataframe contents
+nevents = 10
+nparts = rand(1:10, nevents)
+tree = RootIO.TTree(f, "tree", "My Tree",
+                    nparts = nparts,
+                    pt  = StdVector.(100 .* randexp.(nparts)),
+                    eta = StdVector.(  5 .* randn.(nparts)),
+                    phi = StdVector.( 2π .* randn.(nparts)))
+
+# Display tree contents
+Scan(tree)
+
+# Save the tree and close the file
 RootIO.Write(tree)
-ROOT.Close(file)
+Close(f)
 ```
 
-## C-style arrays
+### Example 6: Table/DataFrame
 
-The syntax for creating a C-style array is ```array_name = (element_type, array_size)```, where:
+This example illustrates how to store a table (in the `Tables.jl` sense), like a `NamedTuple` or a `DataFrame` from the `DataFrames.jl` package.
 
-1. ```array_name``` is the name of column containing the array
-2. ```element_type``` is a data type or an instance of array element
-2. ```array_size``` is the symbol for variable having size of the array for fixed size array, or identifier of the branch that contains the length of the array in case of variable length array 
+_⚠ This example is not yet working with this RootIO version._
 
-### Fixed size C-style arrays
 
 ```julia
-import RootIO, ROOT
-# Create and open the ROOT file
-file = ROOT.TFile!Open("example.root", "RECREATE")
-name = "example_tree"
-title = "Example TTree"
-# Store the size of array as variable
-my_arr_fixed_length = 3
-# Create the column for C-style array
-tree = RootIO.TTree(file, name, title; my_arr = (Int64, my_arr_fixed_length))
-# Write the C-style array to the TTree
-RootIO.Fill(tree, [[1,2,3]])
+using RootIO, ROOT
+using Random
+using DataFrames
+
+# Create the dataframe. Broadcasting is used to vectorize the event/row generation
+nevents = 10
+nparts = rand(1:10, nevents)
+
+# Use here a DataFrame for illustration. It works also for NamedTuple,
+# i.e. after remove `DataFrame` in the statement below, or any other
+# container table type compliant with the `Tables.jl` interface.
+table = DataFrame(nparts = nparts,
+                  pt  = StdVector.(100 .* randexp.(nparts)),
+                  eta = StdVector.(  5 .* randn.(nparts)),
+                  phi = StdVector.( 2π .* randn.(nparts)))
+
+# Create the ROOT file
+f = ROOT.TFile!Open("example.root", "RECREATE")
+
+# Create the tree and fill it with the dataframe contents
+tree = RootIO.TTree(f, "tree", "My Tree", table)
+
+# Display tree contents
+Scan(tree)
+
+# Save the tree and close the file
 RootIO.Write(tree)
-ROOT.Close(file)
+Close(f)
 ```
 
-### Variable size C-style arrays
-
-```julia
-import RootIO, ROOT
-# Create and open the the ROOT file
-file = ROOT.TFile!Open("example.root", "RECREATE")
-name = "example_tree"
-title = "Example TTree"
-# Create the column for array-size and the C-style array
-tree = RootIO.TTree(file, name, title; arr_size = Int64, my_arr = (Int64, :arr_size))
-# Write the C-style array along with its size to the TTree
-RootIO.Fill(tree, [3, [1,10,100]])
-RootIO.Fill(tree, [2, [2,20]])
-RootIO.Write(tree)
-ROOT.Close(file)
-```
