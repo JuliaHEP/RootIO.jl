@@ -134,8 +134,6 @@ Close(f)
 
 ### Example 5: columns provided as vectors
 
-_⚠ This example is not yet working with this version of `RootIO`._
-
 ```julia
 using RootIO, ROOT
 using Random
@@ -163,9 +161,6 @@ Close(f)
 ### Example 6: Table/DataFrame
 
 This example illustrates how to store a table (in the `Tables.jl` sense), like a `NamedTuple` or a `DataFrame` from the `DataFrames.jl` package.
-
-_⚠ This example is not yet working with this RootIO version._
-
 
 ```julia
 using RootIO, ROOT

@@ -7,27 +7,24 @@ function _create_test_tree(data)
     name = "test_tree"
     title = "Test TTree"
     tree = RootIO.TTree(file, name, title; data...)
-    mat = hcat([col[2] for col in data]...)
-    for i in axes(mat, 1)
-        RootIO.Fill(tree, mat[i, :])
-    end
 
     RootIO.Write(tree)
     ROOT.Close(file)
 end
 
-function _test_tree(ele_type, num_events, data)
+function _test_tree(eltype, num_events, data)
     file = ROOT.TFile!Open("test.root")
     t = ROOT.GetTTree(file[], "test_tree")
-
-    a = fill(ele_type(0))
-    ROOT.SetBranchAddress(t[], "col", a)
     nevts = ROOT.GetEntries(t)
 
+    #Check number of written rows
     @test nevts == num_events
-    ROOT.GetEntry(t, 0)
-    @test isa((a[]), ele_type)
+    
+    a = Array{eltype, 0}(undef)
+    ROOT.SetBranchAddress(t[], "col", Ptr{Nothing}(pointer(a)))
+
     mat = hcat([col[2] for col in data]...)
+
     for i in 1:nevts
         ROOT.GetEntry(t, i - 1)
         for j in axes(mat, 2)
@@ -35,6 +32,28 @@ function _test_tree(ele_type, num_events, data)
         end
     end
 
+    ROOT.Close(file)
+    rm("test.root")
+    
+end
+
+function _test_tree(eltype::Type{String}, num_events, data)
+    file = ROOT.TFile!Open("test.root")
+    t = ROOT.GetTTree(file[], "test_tree")
+    nevts = ROOT.GetEntries(t)
+
+    #Check number of written rows
+    @test nevts == num_events
+    
+    maxbufferLen = ROOT.GetLenStatic(ROOT.GetLeaf(t, "col"))
+    s = zeros(Int8, maxbufferLen)
+    ROOT.SetBranchAddress(t[], "col", Ptr{Nothing}(pointer(s)))
+
+    for i in 1:nevts
+        ROOT.GetEntry(t, i - 1)
+        @test GC.@preserve s data[:col][i] == unsafe_string(pointer(s))
+    end
+    
     ROOT.Close(file)
     rm("test.root")
 end
@@ -103,32 +122,13 @@ end
     end
 end
 
+
 @testset "Writing Booleans" begin
     @testset "Bools" begin
         num_events = 3
         data = [:col => rand(Bool, num_events)]
         _create_test_tree(data)
-
-        file = ROOT.TFile!Open("test.root")
-        t = ROOT.GetTTree(file[], "test_tree")
-
-        a = fill(false)
-        ROOT.SetBranchAddress(t[], "col", Ptr{Nothing}(pointer(a)))
-        nevts = ROOT.GetEntries(t)
-
-        @test nevts == num_events
-        ROOT.GetEntry(t, 0)
-        @test isa(a[], Bool)
-        mat = hcat([col[2] for col in data]...)
-        for i in 1:nevts
-            ROOT.GetEntry(t, i - 1)
-            for j in axes(mat, 2)
-                @test mat[i][j] == a[j]
-            end
-        end
-
-        ROOT.Close(file)
-        rm("test.root")
+        _test_tree(Bool, num_events, data)
     end
 end
 
@@ -136,31 +136,12 @@ end
     @testset "String" begin
         data = Dict(:col => ["CERN", "ROOT", "RootIO"])
         _create_test_tree(data)
-
-        file = ROOT.TFile!Open("test.root")
-        t = ROOT.GetTTree(file[], "test_tree")
-
-        maxbufferLen = ROOT.GetLenStatic(ROOT.GetLeaf(t, "col"))
-        s = zeros(Int8, maxbufferLen)
-        ROOT.SetBranchAddress(t[], "col", Ptr{Nothing}(pointer(s)))
-        nevts = ROOT.GetEntries(t)
-
-        @test nevts == 3
-        ROOT.GetEntry(t, 0)
-        @test isa(unsafe_string(pointer(s)), String)
-        for i in 1:nevts
-            ROOT.GetEntry(t, i - 1)
-            @test data[:col][i] == unsafe_string(pointer(s))
-        end
-
-        ROOT.Close(file)
-        rm("test.root")
+        _test_tree(String, 3, data)
     end
 end
 
 @testset "Writing C-style arrays" begin
     @testset "Fixed size C-array" begin
-        import RootIO, ROOT
         file = ROOT.TFile!Open("test.root", "RECREATE")
         name = "test_tree"
         title = "Test TTree"
@@ -191,14 +172,13 @@ end
     end
 
     @testset "Variable size C-array" begin
-        import RootIO, ROOT
         file = ROOT.TFile!Open("test.root", "RECREATE")
         name = "test_tree"
         title = "Test TTree"
-        rows = [[1,10,100], [2,20]]
+        arrays = [[1,10,100], [2,20]]
         tree = RootIO.TTree(file, name, title; arr_size = Int64, my_arr = (Int64, :arr_size))
-        for row in rows 
-            RootIO.Fill(tree, [length(row), row])
+        for arr in arrays 
+            RootIO.Fill(tree, [length(arr), arr])
         end
         RootIO.Write(tree)
         ROOT.Close(file)
@@ -216,9 +196,9 @@ end
         @test isa((arr_sz[]), Int64)
         for i in 1:nevts
             ROOT.GetEntry(t, i - 1)
-            @test arr_sz[] == length(rows[i])
+            @test arr_sz[] == length(arrays[i])
             for j in 1:arr_sz[]
-                @test arr[j] == rows[i][j]
+                @test arr[j] == arrays[i][j]
             end
         end
         ROOT.Close(file)
