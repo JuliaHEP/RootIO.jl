@@ -2,11 +2,13 @@
 
 ## Introduction
 
-The RootIO package provides an easy interface to read and write columnar data sets from and into [ROOT files](https://root.cern/manual/root_files) using the [`TTree`](https://root.cern/doc/master/classTTree.html) representation. A `TTree` is a columnar data representation stored on disk that supports an in-memory buffer for fast data access and automatic writing to disk. This package is based on [ROOT.jl](https://github.com/JuliaHEP/ROOT.jl), a package that provides Julia bindings to the C++ [ROOT](https://root.cern) API.
+The RootIO package provides an easy interface to write columnar data sets from and into [ROOT files](https://root.cern/manual/root_files) using the [`TTree`](https://root.cern/doc/master/classTTree.html) representation. A `TTree` is a columnar data representation stored on disk that supports an in-memory buffer for fast data access and automatic writing to disk. This package is based on [ROOT.jl](https://github.com/JuliaHEP/ROOT.jl), a package that provides Julia bindings to the C++ [ROOT](https://root.cern) API.
 
 The original `TTree` API is heavily based on pointers; it does not translate well to Julia and is not easy to use. The `RootIO` module, to be used alongside the `ROOT` module, provides a higher-level and more user-friendly interface to `TTree`. `RootIO` defines its own `TTree` type to be used in place of `ROOT.TTree`.
 
 _The development of this package was initiated in the context of the 2024 edition of the [Google Summer of Code](https://summerofcode.withgoogle.com/) program under the [CERN-HSF](https://github.com/JuliaHEP/RootIO.jl/blob/main/Introduction) organization._
+
+Only write support is currently implemented. We recommend [UnROOT](https://github.com/JuliaHEP/UnROOT.jl) for an easy read interface to trees. Direct use of ROOT.jl is also possible but requires pointer manipulation. 
 
 ## Contents
 ```@contents
