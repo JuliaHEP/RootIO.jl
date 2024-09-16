@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · RootIO.jl</title><meta name="title" content="Examples · RootIO.jl"/><meta property="og:title" content="Examples · RootIO.jl"/><meta property="twitter:title" content="Examples · RootIO.jl"/><meta name="description" content="Documentation for RootIO.jl."/><meta property="og:description" content="Documentation for RootIO.jl."/><meta property="twitter:description" content="Documentation for RootIO.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">RootIO.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">RootIO.jl</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Row-by-row-filling"><span>Row-by-row filling</span></a></li><li><a class="tocitem" href="#Multiple-row-filling"><span>Multiple-row filling</span></a></li></ul></li><li><a class="tocitem" href="../gettingstarted/">Getting Started</a></li><li><a class="tocitem" href="../typesandmethods/">Types &amp; Methods</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JuliaHEP/RootIO.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JuliaHEP/RootIO.jl/blob/main/docs/src/examples.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Row-by-row-filling"><a class="docs-heading-anchor" href="#Row-by-row-filling">Row-by-row filling</a><a id="Row-by-row-filling-1"></a><a class="docs-heading-anchor-permalink" href="#Row-by-row-filling" title="Permalink"></a></h2><h3 id="Example-1:-storing-scalars"><a class="docs-heading-anchor" href="#Example-1:-storing-scalars">Example 1: storing scalars</a><a id="Example-1:-storing-scalars-1"></a><a class="docs-heading-anchor-permalink" href="#Example-1:-storing-scalars" title="Permalink"></a></h3><p>In this example, the columns are filled with data of primitive types.</p><pre><code class="language-julia hljs">using RootIO, ROOT
+using Random
+
+# Create a ROOT file
+file = ROOT.TFile!Open(&quot;example.root&quot;, &quot;RECREATE&quot;)
+
+# Create the tree
+tree = RootIO.TTree(file, &quot;tree&quot;, &quot;My Tree&quot;, pt = Float64, eta = Float64, phi = Float64)
+
+# Fill the tree with random values
+for i in 1:10
+Fill(tree, (pt = 100*randexp(), eta = 5*randn(), phi = 2π*rand()))
+end
+
+# Display tree content
+Scan(tree)
+
+# Save the tree and close the file
+RootIO.Write(tree)
+ROOT.Close(file)</code></pre><h3 id="Example-2:-storing-value-collections-using-the-array-branch-type"><a class="docs-heading-anchor" href="#Example-2:-storing-value-collections-using-the-array-branch-type">Example 2: storing value collections using the array branch type</a><a id="Example-2:-storing-value-collections-using-the-array-branch-type-1"></a><a class="docs-heading-anchor-permalink" href="#Example-2:-storing-value-collections-using-the-array-branch-type" title="Permalink"></a></h3><p>This example shows how to store a collection of values using the tree branch array type. With the array type, the collection length is specified in a different branch (if not fixed). Upon <code>TTree</code> creation, the array type is specified using a tuple <code>(etype, length)</code>, with <code>etype</code> the element type and <code>length</code> the array size specification, either an integer or a symbol that refers to the name of the branch where the number of elements is stored. </p><pre><code class="language-julia hljs">using RootIO, ROOT
+using Random
+
+# Create a ROOT file
+file = ROOT.TFile!Open(&quot;example.root&quot;, &quot;RECREATE&quot;)
+
+# Create the tree
+tree = RootIO.TTree(file, &quot;tree&quot;, &quot;My Tree&quot;, nparts=Int32, pt=(Float64, :nparts), eta=(Float64, :nparts), phi=(Float64, :nparts))
+
+# Fill the tree with random values
+for i in 1:10
+    n = rand(Vector{Int32}(1:10))
+    Fill(tree, (nparts=n, pt=100*randexp(n), eta=5*randn(n), phi=2π*rand(n)))
+end
+
+# Display the tree content
+Scan(tree)
+
+# Print the tree structure: we notice the array type of the branches e.g., `pt[nparts]/D`
+Print(tree)
+
+# Save the tree and close the file
+Write(tree)
+Close(file)</code></pre><h3 id="Example-3:-storing-collection-of-values-using-STL-vectors"><a class="docs-heading-anchor" href="#Example-3:-storing-collection-of-values-using-STL-vectors">Example 3: storing collection of values using STL vectors</a><a id="Example-3:-storing-collection-of-values-using-STL-vectors-1"></a><a class="docs-heading-anchor-permalink" href="#Example-3:-storing-collection-of-values-using-STL-vectors" title="Permalink"></a></h3><p>This example is similar to Example 2, but it uses standard template library vectors to store the collection of values instead of the ROOT tree array type.</p><pre><code class="language-julia hljs">using RootIO, ROOT
+using Random
+
+# Create a ROOT file
+file = ROOT.TFile!Open(&quot;example.root&quot;, &quot;RECREATE&quot;)
+
+# Create the tree
+tree = RootIO.TTree(file, &quot;tree&quot;, &quot;My Tree&quot;, nparts=Int32, pt=StdVector{Float64}, eta=StdVector{Float64}, phi=StdVector{Float64})
+
+# Fill the tree with random values
+for i in 1:10
+    n = rand(Vector{Int32}(1:10))
+   Fill(tree, (nparts=n, pt=StdVector(100*randexp(n)), eta=StdVector(5*randn(n)), phi=StdVector(2π*rand(n))))
+end
+
+# Display tree content
+Scan(tree)
+
+# Print the tree structure: we notice the `vector&lt;double&gt;` branh types
+Print(tree)
+
+# Save the tree and close the file
+RootIO.Write(tree)
+ROOT.Close(file)</code></pre><h3 id="Example-4:-row-data-grouped-in-a-composite-type"><a class="docs-heading-anchor" href="#Example-4:-row-data-grouped-in-a-composite-type">Example 4: row data grouped in a composite type</a><a id="Example-4:-row-data-grouped-in-a-composite-type-1"></a><a class="docs-heading-anchor-permalink" href="#Example-4:-row-data-grouped-in-a-composite-type" title="Permalink"></a></h3><p>This example is similar to examples 2 and 3, but with row data provided as a composite type (struct).</p><pre><code class="language-julia hljs">using RootIO, ROOT
+using Random
+
+# The composite type used to store data of a row:
+mutable struct Event
+    nparts::Int32
+    pt::StdVector{Float64}
+    eta::StdVector{Float64}
+    phi::StdVector{Float64}
+end
+Event()  = Event(0., StdVector{Float64}(), StdVector{Float64}(), StdVector{Float64}())
+
+# Create the ROOT file
+f = ROOT.TFile!Open(&quot;example.root&quot;, &quot;RECREATE&quot;)
+
+# Create the tree
+tree = RootIO.TTree(f, &quot;tree&quot;, &quot;My Tree&quot;, Event)
+
+e = Event()
+for i in 1:10
+    e.nparts = rand(Vector{Int32}(1:10))
+    e.pt = StdVector(100*randexp(e.nparts))
+    e.eta = StdVector(5*randn(e.nparts))
+    e.phi = StdVector(2π*rand(e.nparts))
+    RootIO.Fill(tree, e)
+end
+
+# Display tree contents
+Scan(tree)
+
+# Save the tree and close the file
+RootIO.Write(tree)
+Close(f)</code></pre><h2 id="Multiple-row-filling"><a class="docs-heading-anchor" href="#Multiple-row-filling">Multiple-row filling</a><a id="Multiple-row-filling-1"></a><a class="docs-heading-anchor-permalink" href="#Multiple-row-filling" title="Permalink"></a></h2><h3 id="Example-5:-columns-provided-as-vectors"><a class="docs-heading-anchor" href="#Example-5:-columns-provided-as-vectors">Example 5: columns provided as vectors</a><a id="Example-5:-columns-provided-as-vectors-1"></a><a class="docs-heading-anchor-permalink" href="#Example-5:-columns-provided-as-vectors" title="Permalink"></a></h3><pre><code class="language-julia hljs">using RootIO, ROOT
+using Random
+
+# Create the ROOT file
+f = ROOT.TFile!Open(&quot;example.root&quot;, &quot;RECREATE&quot;)
+
+# Create the tree and fill it with the dataframe contents
+nevents = 10
+nparts = rand(1:10, nevents)
+tree = RootIO.TTree(f, &quot;tree&quot;, &quot;My Tree&quot;,
+                    nparts = nparts,
+                    pt  = StdVector.(100 .* randexp.(nparts)),
+                    eta = StdVector.(  5 .* randn.(nparts)),
+                    phi = StdVector.( 2π .* randn.(nparts)))
+
+# Display tree contents
+Scan(tree)
+
+# Save the tree and close the file
+RootIO.Write(tree)
+Close(f)</code></pre><h3 id="Example-6:-Table/DataFrame"><a class="docs-heading-anchor" href="#Example-6:-Table/DataFrame">Example 6: Table/DataFrame</a><a id="Example-6:-Table/DataFrame-1"></a><a class="docs-heading-anchor-permalink" href="#Example-6:-Table/DataFrame" title="Permalink"></a></h3><p>This example illustrates how to store a table (in the <code>Tables.jl</code> sense), like a <code>NamedTuple</code> or a <code>DataFrame</code> from the <code>DataFrames.jl</code> package.</p><pre><code class="language-julia hljs">using RootIO, ROOT
+using Random
+using DataFrames
+
+# Create the dataframe. Broadcasting is used to vectorize the event/row generation
+nevents = 10
+nparts = rand(1:10, nevents)
+
+# Use here a DataFrame for illustration. It works also for NamedTuple,
+# i.e. after remove `DataFrame` in the statement below, or any other
+# container table type compliant with the `Tables.jl` interface.
+table = DataFrame(nparts = nparts,
+                  pt  = StdVector.(100 .* randexp.(nparts)),
+                  eta = StdVector.(  5 .* randn.(nparts)),
+                  phi = StdVector.( 2π .* randn.(nparts)))
+
+# Create the ROOT file
+f = ROOT.TFile!Open(&quot;example.root&quot;, &quot;RECREATE&quot;)
+
+# Create the tree and fill it with the dataframe contents
+tree = RootIO.TTree(f, &quot;tree&quot;, &quot;My Tree&quot;, table)
+
+# Display tree contents
+Scan(tree)
+
+# Save the tree and close the file
+RootIO.Write(tree)
+Close(f)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« RootIO.jl</a><a class="docs-footer-nextpage" href="../gettingstarted/">Getting Started »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Monday 16 September 2024 10:04">Monday 16 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
